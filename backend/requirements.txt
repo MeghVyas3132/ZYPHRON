@@ -1,0 +1,59 @@
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.1
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP & APIs
+httpx==0.25.2
+aiohttp==3.9.1
+requests==2.31.0
+
+# Environment
+python-dotenv==1.0.0
+
+# WebSockets (for real-time updates)
+websockets==12.0
+
+# Docker Integration
+docker==7.0.0
+
+# Git Integration
+gitpython==3.1.40
+
+# System & Process
+psutil==5.9.6
+subprocess32==3.5.4
+
+# Monitoring & Logging
+python-json-logger==2.0.7
+
+# Validation & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx[testing]==0.25.2
+
+# Background Tasks
+celery==5.3.4
+redis==5.0.1
+
+# Code Quality
+black==23.12.0
+ruff==0.1.8
+mypy==1.7.1
+
+# Utilities
+pydantic-extra-types==2.3.0
+email-validator==2.1.0

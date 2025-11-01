@@ -1,0 +1,143 @@
+# Zyphron Docker Compose for Production
+# High-availability setup with monitoring and logging
+
+version: '3.9'
+
+services:
+  # PostgreSQL with replication
+  postgres:
+    image: postgres:15-alpine
+    container_name: zyphron_postgres_prod
+    environment:
+      POSTGRES_USER: zyphron
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: zyphron
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./scripts/backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zyphron"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - zyphron_prod_network
+
+  # Redis Cluster
+  redis:
+    image: redis:7-alpine
+    container_name: zyphron_redis_prod
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - zyphron_prod_network
+
+  # FastAPI Backend (multiple instances)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zyphron_backend_prod
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    expose:
+      - "8000"
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://zyphron:${DB_PASSWORD}@postgres:5432/zyphron
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - zyphron_prod_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: zyphron_frontend_prod
+    command: npm start
+    expose:
+      - "3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${BACKEND_URL}
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - zyphron_prod_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: zyphron_nginx_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/certs:/etc/letsencrypt:ro
+      - ./infrastructure/dhparam.pem:/etc/nginx/dhparam.pem:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    networks:
+      - zyphron_prod_network
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zyphron_prometheus
+    volumes:
+      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    restart: always
+    networks:
+      - zyphron_prod_network
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+  prometheus_data:
+
+networks:
+  zyphron_prod_network:
+    driver: bridge
