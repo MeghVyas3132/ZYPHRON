@@ -12,8 +12,8 @@ alembic==1.13.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.1
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic>=2.5.2
+pydantic-settings>=2.1.0
 
 # HTTP & APIs
 httpx==0.25.2
@@ -55,5 +55,5 @@ ruff==0.1.8
 mypy==1.7.1
 
 # Utilities
-pydantic-extra-types==2.3.0
+pydantic-extra-types>=2.5.2
 email-validator==2.1.0
