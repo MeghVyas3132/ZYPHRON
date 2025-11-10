@@ -18,6 +18,7 @@ engine = create_engine(
     echo=settings.DATABASE_ECHO,
     poolclass=NullPool if "sqlite" in settings.DATABASE_URL else None,
     connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    pool_pre_ping=True if "postgresql" in settings.DATABASE_URL else False,
 )
 
 # Session factory
@@ -51,13 +52,3 @@ def receive_connect(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
-
-
-@event.listens_for(engine, "pool_pre_ping")
-def receive_pool_pre_ping(dbapi_conn, connection_record):
-    """Health check connections before using them"""
-    try:
-        dbapi_conn.scalar("SELECT 1")
-    except Exception as e:
-        logger.error(f"Connection health check failed: {str(e)}")
-        raise

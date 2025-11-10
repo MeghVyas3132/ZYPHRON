@@ -8,11 +8,10 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 
 from app.core.config import settings
-from app.database import SessionLocal
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ pwd_context = CryptContext(
 )
 
 # HTTP Bearer security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def init_security():
@@ -104,7 +103,7 @@ def decode_token(token: str) -> dict:
 
 
 async def get_current_user_id(
-    credentials: HTTPAuthCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> int:
     """
     Get current user ID from JWT token
@@ -126,10 +125,82 @@ async def get_current_user_id(
 
 async def get_current_user(
     user_id: int = Depends(get_current_user_id),
-    db: Session = Depends(SessionLocal)
+    db: Session = Depends(lambda: None)
 ):
     """Get current authenticated user"""
     from app.models.user import User
+    from app.database import SessionLocal
+    
+    if db is None:
+        db = SessionLocal()
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive"
+        )
+    
+    return user
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(lambda: None)
+):
+    """
+    Get current user if authenticated, otherwise return a test user for development.
+    Used for endpoints that should work in both authenticated and unauthenticated modes.
+    """
+    from app.models.user import User
+    from app.database import SessionLocal
+    
+    if db is None:
+        db = SessionLocal()
+    
+    # If no credentials provided, use test user
+    if credentials is None:
+        logger.debug("No credentials provided, using test user (ID: 1)")
+        test_user = db.query(User).filter(User.id == 1).first()
+        if test_user:
+            return test_user
+        else:
+            # Test user doesn't exist yet, create it
+            logger.warning("Test user not found, creating one")
+            test_user = User(
+                id=1,
+                email="test@zyphron.local",
+                username="testuser",
+                full_name="Test User",
+                hashed_password=hash_password("testpass123"),
+                is_active=True,
+                is_verified=True,
+                role="user"
+            )
+            db.add(test_user)
+            db.commit()
+            db.refresh(test_user)
+            return test_user
+    
+    # Token provided, decode and validate it
+    token = credentials.credentials
+    payload = decode_token(token)
+    user_id: int = payload.get("sub")
+    
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     user = db.query(User).filter(User.id == user_id).first()
     

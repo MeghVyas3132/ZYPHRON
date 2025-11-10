@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.security import init_security
 from app.api.v1.routers import health, users, deployments, monitoring, subdomain
 from app.database import engine, Base, get_db
+from app.init_db import init_database
 from sqlalchemy.exc import SQLAlchemyError
 
 # Configure logging
@@ -35,6 +36,10 @@ async def lifespan(app: FastAPI):
     # Initialize security
     init_security()
     logger.info("✅ Security initialized")
+    
+    # Initialize database with test data
+    init_database()
+    logger.info("✅ Database seeding complete")
     
     yield
     

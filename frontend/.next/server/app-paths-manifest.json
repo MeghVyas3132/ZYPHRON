@@ -1,0 +1,7 @@
+{
+  "/database/page": "app/database/page.js",
+  "/deployments/page": "app/deployments/page.js",
+  "/subdomains/page": "app/subdomains/page.js",
+  "/page": "app/page.js",
+  "/monitoring/page": "app/monitoring/page.js"
+}

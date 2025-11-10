@@ -2,7 +2,7 @@
 User model for database
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -50,7 +50,7 @@ class APIKey(Base):
     __tablename__ = "api_keys"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
     key = Column(String(255), unique=True, index=True, nullable=False)
     name = Column(String(255), nullable=False)
     

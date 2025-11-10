@@ -21,6 +21,23 @@ services:
     networks:
       - zyphron_network
 
+  # pgAdmin - Database Management UI
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: zyphron_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@zyphron.dev
+      PGADMIN_DEFAULT_PASSWORD: zyphron
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - zyphron_network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
   # Redis for caching and background tasks
   redis:
     image: redis:7-alpine
@@ -51,6 +68,8 @@ services:
       - SECRET_KEY=dev-secret-key-change-in-production
       - JWT_SECRET_KEY=dev-jwt-secret-key-change-in-production
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - JENKINS_URL=http://zyphron_jenkins:8080
+      - JENKINS_TOKEN=dev-jenkins-token
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -91,14 +110,37 @@ services:
     volumes:
       - ./infrastructure/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/certs:/etc/letsencrypt:ro
+      - /var/log/nginx:/var/log/nginx
     depends_on:
       - backend
       - frontend
     networks:
       - zyphron_network
+    restart: unless-stopped
+
+  # Jenkins CI/CD Pipeline
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: zyphron_jenkins
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - JENKINS_OPTS=--httpPort=8080
+    networks:
+      - zyphron_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  pgadmin_data:
+  jenkins_data:
 
 networks:
   zyphron_network:
